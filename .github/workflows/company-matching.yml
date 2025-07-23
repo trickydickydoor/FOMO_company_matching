@@ -35,7 +35,7 @@ jobs:
         
     - name: 上传日志文件
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: matching-logs
         path: logs/
