@@ -1,0 +1,9 @@
+requests
+pandas
+beautifulsoup4
+lxml
+supabase
+pytz
+pinecone
+google-generativeai
+google-genai
