@@ -30,6 +30,7 @@ class CompanyMatcher:
         self.setup_logging()
         self.supabase_handler = None
         self.companies: List[str] = []
+        self.company_mapping: Dict[str, str] = {}  # 别名到公司名的映射
         self.processed_count = 0
         self.matched_count = 0
         self.lock = threading.Lock()
@@ -94,24 +95,47 @@ class CompanyMatcher:
             return False
     
     def get_companies(self) -> bool:
-        """获取所有公司名称"""
+        """获取所有公司名称和别名"""
         try:
-            self.logger.info("开始获取公司列表...")
+            self.logger.info("开始获取公司列表和别名...")
             
-            # 从 companies 表获取所有公司名称
-            response = self.supabase_handler.client.table('companies').select('name').execute()
+            # 从 companies 表获取公司名称和别名
+            response = self.supabase_handler.client.table('companies').select('name, aliases').execute()
             
             if not response.data:
                 self.logger.warning("未获取到任何公司数据")
                 return False
             
-            # 提取公司名称并转换为小写
-            self.companies = [company['name'].lower().strip() for company in response.data if company.get('name')]
+            # 构建公司名称列表和别名映射
+            all_terms = []
+            self.company_mapping = {}
+            
+            for company in response.data:
+                company_name = company.get('name', '').strip()
+                aliases = company.get('aliases', []) or []
+                
+                if not company_name:
+                    continue
+                
+                # 添加公司名称
+                company_name_lower = company_name.lower()
+                all_terms.append(company_name_lower)
+                self.company_mapping[company_name_lower] = company_name
+                
+                # 添加所有别名
+                if isinstance(aliases, list):
+                    for alias in aliases:
+                        if alias and isinstance(alias, str):
+                            alias_lower = alias.lower().strip()
+                            if alias_lower and alias_lower not in self.company_mapping:
+                                all_terms.append(alias_lower)
+                                self.company_mapping[alias_lower] = company_name
             
             # 去重并过滤空值
-            self.companies = list(set(filter(None, self.companies)))
+            self.companies = list(set(filter(None, all_terms)))
             
-            self.logger.info(f"成功获取 {len(self.companies)} 个公司名称")
+            total_aliases = len(self.companies) - len(response.data)
+            self.logger.info(f"成功获取 {len(response.data)} 家公司，{total_aliases} 个别名，总计 {len(self.companies)} 个匹配词条")
             return True
             
         except Exception as e:
@@ -133,42 +157,29 @@ class CompanyMatcher:
             return []
     
     def match_companies_in_content(self, content: str) -> List[str]:
-        """在内容中匹配公司名称"""
+        """在内容中匹配公司名称和别名"""
         if not content or not self.companies:
             return []
         
         # 转换为小写进行匹配
         content_lower = content.lower()
-        matched_companies = []
+        matched_companies = set()  # 使用set避免重复
         
-        for company in self.companies:
-            if not company:
+        for term in self.companies:
+            if not term:
                 continue
                 
-            # 计算公司名称在内容中出现的次数
-            count = content_lower.count(company)
+            # 计算匹配词条在内容中出现的次数
+            count = content_lower.count(term)
             
             # 如果出现2次及以上，认为相关
             if count >= 2:
-                # 找到原始大小写的公司名称
-                original_company = next(
-                    (c['name'] for c in self.get_original_companies() 
-                     if c['name'].lower() == company), 
-                    company
-                )
-                matched_companies.append(original_company)
+                # 通过映射找到原始公司名称
+                original_company = self.company_mapping.get(term, term)
+                matched_companies.add(original_company)
         
-        return matched_companies
+        return list(matched_companies)
     
-    def get_original_companies(self) -> List[Dict[str, str]]:
-        """获取原始大小写的公司名称（用于缓存）"""
-        if not hasattr(self, '_original_companies'):
-            try:
-                response = self.supabase_handler.client.table('companies').select('name').execute()
-                self._original_companies = response.data if response.data else []
-            except:
-                self._original_companies = []
-        return self._original_companies
     
     def process_news_batch(self, news_batch: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """处理一批新闻数据"""
