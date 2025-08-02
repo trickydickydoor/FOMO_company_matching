@@ -1,8 +1,0 @@
-{
-  "supabase": {
-    "enabled": true,
-    "url": "https://tldrapsxinewzhbetvtk.supabase.co",
-    "anon_key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsZHJhcHN4aW5ld3poYmV0dnRrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MjcwNzc3NiwiZXhwIjoyMDY4MjgzNzc2fQ.zZL1J4klw9Hte_94-JSC-4MIeUWNe8qw44SQED5dHQM",
-    "table_name": "news_items"
-  }
-}
